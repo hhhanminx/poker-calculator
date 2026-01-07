@@ -642,6 +642,298 @@
             border-color: var(--danger);
             color: var(--danger);
         }
+        
+        /* Camera Styles */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        
+        #camera-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        #camera-canvas {
+            display: none;
+        }
+        
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+        
+        .scan-region {
+            position: absolute;
+            top: 15%;
+            left: 10%;
+            right: 10%;
+            bottom: 15%;
+            border: 2px solid rgba(99, 102, 241, 0.5);
+            border-radius: 12px;
+        }
+        
+        .scan-corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: var(--accent);
+            border-style: solid;
+        }
+        
+        .scan-corner.tl {
+            top: -2px;
+            left: -2px;
+            border-width: 3px 0 0 3px;
+            border-radius: 8px 0 0 0;
+        }
+        
+        .scan-corner.tr {
+            top: -2px;
+            right: -2px;
+            border-width: 3px 3px 0 0;
+            border-radius: 0 8px 0 0;
+        }
+        
+        .scan-corner.bl {
+            bottom: -2px;
+            left: -2px;
+            border-width: 0 0 3px 3px;
+            border-radius: 0 0 0 8px;
+        }
+        
+        .scan-corner.br {
+            bottom: -2px;
+            right: -2px;
+            border-width: 0 3px 3px 0;
+            border-radius: 0 0 8px 0;
+        }
+        
+        .camera-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-elevated);
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .camera-placeholder.hidden {
+            display: none;
+        }
+        
+        .camera-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        
+        .camera-controls .btn-secondary {
+            flex: 1;
+            padding: 10px;
+            font-size: 13px;
+        }
+        
+        .scan-status {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 12px;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+        }
+        
+        .scan-status.detecting {
+            color: var(--warning);
+        }
+        
+        .scan-status.success {
+            color: var(--success);
+        }
+        
+        /* Recognized Cards */
+        .recognized-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 60px;
+            padding: 12px;
+            background: var(--bg-elevated);
+            border-radius: 10px;
+        }
+        
+        .recognized-empty {
+            color: var(--text-muted);
+            font-size: 14px;
+            width: 100%;
+            text-align: center;
+            padding: 12px;
+        }
+        
+        .recognized-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 64px;
+            background: white;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+        
+        .recognized-card:active {
+            transform: scale(0.95);
+        }
+        
+        .recognized-card.red {
+            color: var(--red-suit);
+        }
+        
+        .recognized-card.black {
+            color: #1a1a24;
+        }
+        
+        .recognized-card.selected {
+            outline: 3px solid var(--accent);
+            outline-offset: 2px;
+        }
+        
+        /* Tips List */
+        .tips-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .tips-list li {
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding: 6px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .tips-list li::before {
+            content: "•";
+            position: absolute;
+            left: 6px;
+            color: var(--accent);
+        }
+        
+        /* Manual Input in Camera Tab */
+        .manual-input-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .manual-input-row {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .manual-input-row .input-field {
+            flex: 1;
+            font-size: 14px;
+            padding: 10px 12px;
+        }
+        
+        .manual-input-row .btn-secondary {
+            white-space: nowrap;
+        }
+        
+        /* Quick Card Picker */
+        .quick-card-picker {
+            display: grid;
+            grid-template-columns: repeat(13, 1fr);
+            gap: 4px;
+        }
+        
+        .quick-pick-btn {
+            aspect-ratio: 0.8;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-elevated);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            transition: all 0.15s ease;
+        }
+        
+        .quick-pick-btn:active {
+            transform: scale(0.9);
+        }
+        
+        .quick-pick-btn.red {
+            color: var(--red-suit);
+        }
+        
+        .quick-pick-btn.black {
+            color: var(--black-suit);
+        }
+        
+        .quick-pick-btn.added {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        
+        .quick-pick-btn .qp-rank {
+            font-size: 11px;
+            line-height: 1;
+        }
+        
+        .quick-pick-btn .qp-suit {
+            font-size: 10px;
+            line-height: 1;
+        }
+        
+        @media (max-width: 400px) {
+            .quick-card-picker {
+                grid-template-columns: repeat(13, 1fr);
+                gap: 2px;
+            }
+            .quick-pick-btn {
+                font-size: 8px;
+            }
+            .quick-pick-btn .qp-rank {
+                font-size: 9px;
+            }
+            .quick-pick-btn .qp-suit {
+                font-size: 8px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -654,8 +946,9 @@
         
         <!-- Tab Bar -->
         <div class="tab-bar">
-            <button class="tab-btn active" data-tab="quick">Quick Calc</button>
-            <button class="tab-btn" data-tab="visual">Card Select</button>
+            <button class="tab-btn active" data-tab="quick">Quick</button>
+            <button class="tab-btn" data-tab="visual">Select</button>
+            <button class="tab-btn" data-tab="camera">📷 Scan</button>
         </div>
         
         <!-- Content -->
@@ -744,6 +1037,91 @@
                 </div>
                 
                 <button class="btn-primary" id="visual-calc-btn">Calculate Equity</button>
+            </div>
+            
+            <!-- Camera Scan Tab -->
+            <div id="camera-tab" class="tab-content">
+                <div class="section">
+                    <div class="section-title">Camera Card Recognition</div>
+                    
+                    <div class="camera-container" id="camera-container">
+                        <video id="camera-video" autoplay playsinline muted></video>
+                        <canvas id="camera-canvas"></canvas>
+                        <div class="camera-overlay">
+                            <div class="scan-region">
+                                <div class="scan-corner tl"></div>
+                                <div class="scan-corner tr"></div>
+                                <div class="scan-corner bl"></div>
+                                <div class="scan-corner br"></div>
+                            </div>
+                        </div>
+                        <div class="camera-placeholder" id="camera-placeholder">
+                            <div class="camera-icon">📷</div>
+                            <div>Tap to start camera</div>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-controls">
+                        <button class="btn-secondary" id="start-camera-btn">Start Camera</button>
+                        <button class="btn-secondary" id="capture-btn" disabled>Capture</button>
+                        <button class="btn-secondary" id="switch-camera-btn">Flip</button>
+                    </div>
+                    
+                    <div class="scan-status" id="scan-status">
+                        Point camera at playing cards
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Recognized Cards</div>
+                    
+                    <div class="recognized-cards" id="recognized-cards">
+                        <div class="recognized-empty">No cards detected yet</div>
+                    </div>
+                    
+                    <div class="action-row" style="margin-top: 16px;">
+                        <button class="btn-secondary" id="set-scan-hero">Set as Hand</button>
+                        <button class="btn-secondary" id="set-scan-board">Set as Board</button>
+                        <button class="btn-secondary" id="clear-scan">Clear</button>
+                    </div>
+                    
+                    <div class="selection-display" style="margin-top: 16px;">
+                        <div class="selection-box">
+                            <div class="selection-label">HAND</div>
+                            <div class="selection-cards hero empty" id="scan-hero-display">—</div>
+                        </div>
+                        <div class="selection-box">
+                            <div class="selection-label">BOARD</div>
+                            <div class="selection-cards board empty" id="scan-board-display">—</div>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Opponents</label>
+                        <div class="stepper">
+                            <button class="stepper-btn" id="scan-opp-minus">−</button>
+                            <span class="stepper-value" id="scan-opp-value">2</span>
+                            <button class="stepper-btn" id="scan-opp-plus">+</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn-primary" id="scan-calc-btn">Calculate Equity</button>
+                
+                <div class="format-ref">
+                    <div class="format-title">TIPS FOR BEST RESULTS</div>
+                    <ul class="tips-list">
+                        <li>Use good lighting</li>
+                        <li>Place cards on contrasting background</li>
+                        <li>Keep cards flat and fully visible</li>
+                        <li>Hold phone steady when capturing</li>
+                    </ul>
+                </div>
+                
+                <div class="section" style="margin-top: 16px;">
+                    <div class="section-title">Quick Add Cards Manually</div>
+                    <div class="quick-card-picker" id="quick-card-picker"></div>
+                </div>
             </div>
             
             <!-- Results Container -->
