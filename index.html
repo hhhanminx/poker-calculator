@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Poker Calc">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="description" content="Texas Hold'em Equity Calculator with GTO">
+    
+    <title>Poker Equity Calculator</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS Icons -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --bg-elevated: #22222e;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #52525b;
+            --border: #27272a;
+            --red-suit: #ef4444;
+            --black-suit: #e4e4e7;
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            overflow-x: hidden;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+        }
+        
+        /* App Container */
+        .app {
+            max-width: 500px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .header {
+            padding: 16px 20px;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        
+        /* Tab Bar */
+        .tab-bar {
+            display: flex;
+            gap: 8px;
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .tab-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        
+        /* Content */
+        .content {
+            flex: 1;
+            padding: 0 20px 100px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Cards Section */
+        .section {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+        
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+        
+        /* Input Groups */
+        .input-group {
+            margin-bottom: 16px;
+        }
+        
+        .input-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 18px;
+            font-family: 'SF Mono', Monaco, monospace;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        
+        .input-field:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .input-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+        
+        /* Stepper */
+        .stepper {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .stepper-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        
+        .stepper-btn:active {
+            transform: scale(0.95);
+            background: var(--accent);
+        }
+        
+        .stepper-value {
+            font-size: 24px;
+            font-weight: 700;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        /* Primary Button */
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Secondary Button */
+        .btn-secondary {
+            padding: 12px 20px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .btn-secondary:active {
+            background: var(--border);
+        }
+        
+        /* Card Grid */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+        
+        .card-grid-header {
+            display: contents;
+        }
+        
+        .suit-label {
+            font-size: 20px;
+            text-align: center;
+            padding: 8px;
+        }
+        
+        .rank-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card-btn {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .card-btn .rank {
+            font-size: 15px;
+            font-weight: 700;
+        }
+        
+        .card-btn .suit {
+            font-size: 12px;
+        }
+        
+        .card-btn.red { color: var(--red-suit); }
+        .card-btn.black { color: var(--black-suit); }
+        
+        .card-btn.selected-temp {
+            background: var(--warning);
+            border-color: var(--warning);
+            color: black !important;
+        }
+        
+        .card-btn.selected-hero {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white !important;
+        }
+        
+        .card-btn.selected-board {
+            background: var(--success);
+            border-color: var(--success);
+            color: white !important;
+        }
+        
+        .card-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Selection Display */
+        .selection-display {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .selection-box {
+            flex: 1;
+            padding: 16px;
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .selection-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        
+        .selection-cards {
+            font-size: 20px;
+            font-weight: 700;
+            min-height: 28px;
+        }
+        
+        .selection-cards.hero { color: var(--accent-light); }
+        .selection-cards.board { color: var(--success); }
+        .selection-cards.empty { color: var(--text-muted); font-size: 14px; }
+        
+        /* Action Buttons Row */
+        .action-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        
+        .action-row .btn-secondary {
+            flex: 1;
+            font-size: 13px;
+            padding: 10px;
+        }
+        
+        /* Results */
+        .results {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .result-hand {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .result-type {
+            font-size: 14px;
+            color: var(--text-secondary);
+            background: var(--bg-elevated);
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        
+        .equity-display {
+            text-align: center;
+            padding: 24px 0;
+            margin-bottom: 20px;
+        }
+        
+        .equity-value {
+            font-size: 56px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--success) 0%, #86efac 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .equity-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        
+        .stat-value.win { color: var(--success); }
+        .stat-value.tie { color: var(--warning); }
+        .stat-value.lose { color: var(--danger); }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* GTO Section */
+        .gto-section {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        
+        .gto-title {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        
+        .gto-advice {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .gto-action {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--warning);
+        }
+        
+        .gto-rank {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        /* Batch Results */
+        .batch-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .batch-item:last-child {
+            border-bottom: none;
+        }
+        
+        .batch-name {
+            font-size: 15px;
+            color: var(--text-primary);
+        }
+        
+        .batch-stats {
+            text-align: right;
+        }
+        
+        .batch-equity {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--success);
+        }
+        
+        .batch-range {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        /* Loading */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 0;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 16px;
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .empty-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .empty-desc {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        /* Format Reference */
+        .format-ref {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        .format-title {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        
+        .format-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            font-size: 13px;
+        }
+        
+        .format-item {
+            color: var(--text-secondary);
+        }
+        
+        .format-item span {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: calc(100px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 15px;
+            color: var(--text-primary);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        .toast.error {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>Poker Calculator</h1>
+            <div class="header-subtitle">Texas Hold'em Equity & GTO</div>
+        </header>
+        
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="quick">Quick Calc</button>
+            <button class="tab-btn" data-tab="visual">Card Select</button>
+        </div>
+        
+        <!-- Content -->
+        <main class="content">
+            <!-- Quick Calc Tab -->
+            <div id="quick-tab" class="tab-content active">
+                <div class="section">
+                    <div class="section-title">Hand Input</div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Your Hand</label>
+                        <input type="text" class="input-field" id="hero-input" 
+                               placeholder="AsKh" autocomplete="off" autocapitalize="off">
+                        <div class="input-hint">Enter 2 cards (e.g., AsKh, TdTc)</div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Opponents</label>
+                        <div class="stepper">
+                            <button class="stepper-btn" id="opp-minus">−</button>
+                            <span class="stepper-value" id="opp-value">2</span>
+                            <button class="stepper-btn" id="opp-plus">+</button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Board (Optional)</label>
+                        <input type="text" class="input-field" id="board-input" 
+                               placeholder="Flop, Turn, River" autocomplete="off" autocapitalize="off">
+                        <div class="input-hint">0, 3, 4, or 5 cards</div>
+                    </div>
+                </div>
+                
+                <button class="btn-primary" id="calc-btn">Calculate Equity</button>
+                
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                    <button class="btn-secondary" style="flex: 1;" id="batch-btn">Batch Analysis</button>
+                    <button class="btn-secondary" style="flex: 1;" id="clear-btn">Clear</button>
+                </div>
+                
+                <div class="format-ref">
+                    <div class="format-title">CARD FORMAT</div>
+                    <div class="format-grid">
+                        <div class="format-item"><span>A K Q J T 9-2</span> Rank</div>
+                        <div class="format-item"><span>s h d c</span> Suit</div>
+                        <div class="format-item"><span>As</span> = A♠</div>
+                        <div class="format-item"><span>Kh</span> = K♥</div>
+                        <div class="format-item"><span>Qd</span> = Q♦</div>
+                        <div class="format-item"><span>Jc</span> = J♣</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Visual Select Tab -->
+            <div id="visual-tab" class="tab-content">
+                <div class="section">
+                    <div class="section-title">Select Cards</div>
+                    
+                    <div class="selection-display">
+                        <div class="selection-box">
+                            <div class="selection-label">HAND</div>
+                            <div class="selection-cards hero empty" id="hero-display">Select 2</div>
+                        </div>
+                        <div class="selection-box">
+                            <div class="selection-label">BOARD</div>
+                            <div class="selection-cards board empty" id="board-display">Optional</div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-row">
+                        <button class="btn-secondary" id="set-hero-btn">Set Hand</button>
+                        <button class="btn-secondary" id="set-board-btn">Set Board</button>
+                        <button class="btn-secondary" id="clear-sel-btn">Clear</button>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Opponents</label>
+                        <div class="stepper">
+                            <button class="stepper-btn" id="visual-opp-minus">−</button>
+                            <span class="stepper-value" id="visual-opp-value">2</span>
+                            <button class="stepper-btn" id="visual-opp-plus">+</button>
+                        </div>
+                    </div>
+                    
+                    <div id="card-grid-container"></div>
+                </div>
+                
+                <button class="btn-primary" id="visual-calc-btn">Calculate Equity</button>
+            </div>
+            
+            <!-- Results Container -->
+            <div id="results-container" style="margin-top: 20px;"></div>
+        </main>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
