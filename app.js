@@ -1,6 +1,11 @@
 /**
- * Texas Hold'em Equity Calculator - Auto EV Calculation
+ * Poker AI - Main Application
+ * Integrates card detection with equity calculation
  */
+
+// ============================================================
+// Poker Engine
+// ============================================================
 
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 const SUITS = ['c', 'd', 'h', 's'];
@@ -19,22 +24,23 @@ class Card {
     constructor(rank, suit) { this.rank = rank; this.suit = suit; this.value = RANK_VALUES[rank]; }
     toString() { return `${this.rank}${SUIT_SYMBOLS[this.suit]}`; }
     toCode() { return `${this.rank}${this.suit}`; }
-    static fromString(s) { return new Card(s[0].toUpperCase(), s[1].toLowerCase()); }
+    static fromCode(s) { return new Card(s[0].toUpperCase(), s[1].toLowerCase()); }
 }
 
 function createDeck() {
-    const deck = [];
-    for (const suit of SUITS) for (const rank of RANKS) deck.push(new Card(rank, suit));
-    return deck;
+    return SUITS.flatMap(s => RANKS.map(r => new Card(r, s)));
 }
 
-function shuffleArray(arr) {
+function shuffle(arr) {
     const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
     return a;
 }
 
-function getCombinations(arr, k) {
+function combinations(arr, k) {
     const result = [];
     function combine(start, combo) {
         if (combo.length === k) { result.push([...combo]); return; }
@@ -47,7 +53,7 @@ function getCombinations(arr, k) {
 function evaluateHand(cards) {
     if (cards.length < 5) return { rank: 0, value: 0 };
     let best = { rank: 0, value: 0 };
-    for (const combo of getCombinations(cards, 5)) {
+    for (const combo of combinations(cards, 5)) {
         const r = evaluate5(combo);
         if (r.rank > best.rank || (r.rank === best.rank && r.value > best.value)) best = r;
     }
@@ -64,8 +70,10 @@ function evaluate5(cards) {
     
     const unique = [...new Set(vals)].sort((a, b) => b - a);
     let straight = false;
-    if (unique.includes(14) && unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) straight = 5;
-    for (let i = 0; i <= unique.length - 5 && !straight; i++) if (unique[i] - unique[i + 4] === 4) straight = unique[i];
+    if (unique.length >= 5) {
+        if (unique.includes(14) && unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) straight = 5;
+        for (let i = 0; i <= unique.length - 5 && !straight; i++) if (unique[i] - unique[i + 4] === 4) straight = unique[i];
+    }
     
     if (isFlush && straight) return { rank: 8, value: straight };
     if (cv[0] === 4) return { rank: 7, value: +Object.keys(counts).find(k => counts[k] === 4) };
@@ -81,382 +89,600 @@ function evaluate5(cards) {
     return { rank: 0, value: vals.reduce((a, v, i) => a + v * Math.pow(15, 4-i), 0) };
 }
 
-function monteCarloEquity(heroCards, numOpp, board, sims = 8000) {
-    const used = new Set([...heroCards.map(c => c.toCode()), ...board.map(c => c.toCode())]);
+function calculateEquity(heroCodes, boardCodes, opponents, sims = 8000) {
+    const heroCards = heroCodes.map(c => Card.fromCode(c));
+    const boardCards = boardCodes.map(c => Card.fromCode(c));
+    const used = new Set([...heroCodes, ...boardCodes]);
     const deck = createDeck().filter(c => !used.has(c.toCode()));
-    let wins = 0, ties = 0;
     
+    let wins = 0, ties = 0;
     for (let i = 0; i < sims; i++) {
-        const sh = shuffleArray(deck);
+        const sh = shuffle(deck);
         let idx = 0;
-        const fb = [...board];
-        while (fb.length < 5) fb.push(sh[idx++]);
-        const hEval = evaluateHand([...heroCards, ...fb]);
+        const board = [...boardCards];
+        while (board.length < 5) board.push(sh[idx++]);
+        
+        const heroEval = evaluateHand([...heroCards, ...board]);
         let best = true, tied = false;
-        for (let o = 0; o < numOpp; o++) {
-            const oEval = evaluateHand([sh[idx++], sh[idx++], ...fb]);
-            if (oEval.rank > hEval.rank || (oEval.rank === hEval.rank && oEval.value > hEval.value)) { best = false; break; }
-            else if (oEval.rank === hEval.rank && oEval.value === hEval.value) tied = true;
+        
+        for (let o = 0; o < opponents; o++) {
+            const oppEval = evaluateHand([sh[idx++], sh[idx++], ...board]);
+            if (oppEval.rank > heroEval.rank || (oppEval.rank === heroEval.rank && oppEval.value > heroEval.value)) { best = false; break; }
+            else if (oppEval.rank === heroEval.rank && oppEval.value === heroEval.value) tied = true;
         }
         if (best && !tied) wins++;
         else if (best && tied) ties++;
     }
+    
     const w = (wins / sims) * 100, t = (ties / sims) * 100;
     return { win: w, tie: t, lose: 100 - w - t, equity: w + t * 0.5 };
 }
 
-function getHandCategory(cards) {
-    if (cards.length !== 2) return '??';
-    const [c1, c2] = cards[0].value > cards[1].value ? cards : [cards[1], cards[0]];
-    if (c1.rank === c2.rank) return `${c1.rank}${c2.rank}`;
-    return c1.suit === c2.suit ? `${c1.rank}${c2.rank}s` : `${c1.rank}${c2.rank}o`;
+function getHandCategory(codes) {
+    if (codes.length !== 2) return '??';
+    const c1 = Card.fromCode(codes[0]), c2 = Card.fromCode(codes[1]);
+    const [h, l] = c1.value > c2.value ? [c1, c2] : [c2, c1];
+    if (h.rank === l.rank) return `${h.rank}${l.rank}`;
+    return h.suit === l.suit ? `${h.rank}${l.rank}s` : `${h.rank}${l.rank}o`;
 }
 
-function getGTOAdvice(cards) {
-    const cat = getHandCategory(cards);
+function getGTO(codes) {
+    const cat = getHandCategory(codes);
     const rank = GTO_RANKINGS[cat] || 100;
     let action = rank <= 10 ? 'Strong Raise' : rank <= 25 ? 'Open Raise' : rank <= 50 ? 'Call' : 'Fold';
     return { category: cat, ranking: rank, action };
 }
 
-function batchAnalysis(hero, opp, nFlops = 300, simsPerFlop = 100) {
-    const used = new Set(hero.map(c => c.toCode()));
-    const deck = createDeck().filter(c => !used.has(c.toCode()));
-    const hHigh = Math.max(hero[0].value, hero[1].value), hLow = Math.min(hero[0].value, hero[1].value);
-    const hSuits = new Set([hero[0].suit, hero[1].suit]);
-    const results = { 'Top Pair': [], 'Low Pair': [], 'Flush Draw': [], 'Straight Draw': [], 'Dry Board': [] };
-    
-    for (let i = 0; i < nFlops; i++) {
-        const flop = shuffleArray(deck).slice(0, 3);
-        const fv = flop.map(c => c.value), fs = flop.map(c => c.suit);
-        const hiPair = fv.includes(hHigh), loPair = fv.includes(hLow) && !hiPair;
-        const sc = {}; for (const s of fs) sc[s] = (sc[s] || 0) + 1;
-        const fd = Object.entries(sc).some(([s, c]) => c >= 2 && hSuits.has(s));
-        const av = [...fv, hHigh, hLow].sort((a, b) => a - b);
-        let sd = false; for (let j = 0; j <= av.length - 4; j++) if (av[j + 3] - av[j] <= 4) { sd = true; break; }
-        const eq = monteCarloEquity(hero, opp, flop, simsPerFlop);
-        if (hiPair) results['Top Pair'].push(eq.equity);
-        else if (loPair) results['Low Pair'].push(eq.equity);
-        else if (fd) results['Flush Draw'].push(eq.equity);
-        else if (sd) results['Straight Draw'].push(eq.equity);
-        else results['Dry Board'].push(eq.equity);
-    }
-    const summary = {};
-    for (const [k, v] of Object.entries(results)) if (v.length) summary[k] = { avg: v.reduce((a, b) => a + b, 0) / v.length, min: Math.min(...v), max: Math.max(...v), count: v.length };
-    return summary;
-}
-
 // ============================================================
-// App
+// Application
 // ============================================================
 
-class PokerApp {
+class PokerAI {
     constructor() {
-        this.opponents = 2;
-        this.visualOpponents = 2;
-        this.scanOpponents = 2;
-        this.visualMode = 'hero';
-        this.scanMode = 'hero';
-        this.visualHero = [];
-        this.visualBoard = [];
-        this.scanHero = [];
-        this.scanBoard = [];
-        this.cardButtons = {};
-        this.quickPickButtons = {};
+        this.detector = new CardDetector();
         this.cameraStream = null;
         this.facingMode = 'environment';
-        this.autoScanActive = false;
+        this.autoDetect = false;
+        this.autoInterval = null;
+        
+        this.detectedCards = []; // All detected cards
+        this.heroCards = [];     // First 2 cards
+        this.boardCards = [];    // Next 3-5 cards
+        this.opponents = 2;
+        
+        this.manualHero = [];
+        this.manualBoard = [];
+        this.manualOpponents = 2;
+        this.manualMode = 'hero';
+        
+        this.quickOpponents = 2;
+        
+        this.pickMode = 'hero'; // For quick picker in scan tab
+        
         this.init();
     }
     
-    init() {
+    async init() {
+        // Show loading screen
+        this.updateLoading('Initializing AI...', 5);
+        
+        // Initialize detector
+        await this.detector.initialize((msg, progress) => {
+            this.updateLoading(msg, progress);
+        });
+        
+        // Hide loading
+        document.getElementById('model-loading').classList.add('hidden');
+        
+        // Setup UI
         this.setupTabs();
+        this.setupScanTab();
+        this.setupManualTab();
         this.setupQuickTab();
-        this.setupVisualTab();
-        this.setupCameraTab();
-        this.buildCardGrid();
-        this.buildQuickPicker();
+        this.buildQuickPicker('quick-picker', this.onQuickPickerClick.bind(this));
+        this.buildQuickPicker('manual-picker', this.onManualPickerClick.bind(this));
+    }
+    
+    updateLoading(text, progress) {
+        document.getElementById('loading-text').textContent = text;
+        document.getElementById('loading-bar').style.width = `${progress}%`;
     }
     
     setupTabs() {
-        document.querySelectorAll('.tab-btn').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+                document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
             });
         });
     }
     
+    setupScanTab() {
+        // Camera controls
+        document.getElementById('camera-placeholder').onclick = () => this.startCamera();
+        document.getElementById('start-btn').onclick = () => this.startCamera();
+        document.getElementById('detect-btn').onclick = () => this.detectOnce();
+        document.getElementById('auto-btn').onclick = () => this.toggleAutoDetect();
+        document.getElementById('flip-btn').onclick = () => this.flipCamera();
+        document.getElementById('clear-detected').onclick = () => this.clearDetected();
+        
+        // Opponents stepper
+        document.getElementById('opp-minus').onclick = () => {
+            if (this.opponents > 1) {
+                this.opponents--;
+                document.getElementById('opp-value').textContent = this.opponents;
+                this.updateEquity();
+            }
+        };
+        document.getElementById('opp-plus').onclick = () => {
+            if (this.opponents < 9) {
+                this.opponents++;
+                document.getElementById('opp-value').textContent = this.opponents;
+                this.updateEquity();
+            }
+        };
+        
+        // Pick mode
+        document.getElementById('mode-hero').onclick = () => {
+            this.pickMode = 'hero';
+            document.getElementById('mode-hero').classList.add('active');
+            document.getElementById('mode-board').classList.remove('active');
+        };
+        document.getElementById('mode-board').onclick = () => {
+            this.pickMode = 'board';
+            document.getElementById('mode-board').classList.add('active');
+            document.getElementById('mode-hero').classList.remove('active');
+        };
+    }
+    
+    setupManualTab() {
+        document.getElementById('manual-mode-hero').onclick = () => {
+            this.manualMode = 'hero';
+            document.getElementById('manual-mode-hero').classList.add('active');
+            document.getElementById('manual-mode-board').classList.remove('active');
+        };
+        document.getElementById('manual-mode-board').onclick = () => {
+            this.manualMode = 'board';
+            document.getElementById('manual-mode-board').classList.add('active');
+            document.getElementById('manual-mode-hero').classList.remove('active');
+        };
+        document.getElementById('manual-clear').onclick = () => {
+            this.manualHero = [];
+            this.manualBoard = [];
+            this.updateManualDisplay();
+            this.updateManualPicker();
+        };
+        
+        document.getElementById('manual-opp-minus').onclick = () => {
+            if (this.manualOpponents > 1) document.getElementById('manual-opp-value').textContent = --this.manualOpponents;
+        };
+        document.getElementById('manual-opp-plus').onclick = () => {
+            if (this.manualOpponents < 9) document.getElementById('manual-opp-value').textContent = ++this.manualOpponents;
+        };
+        
+        document.getElementById('manual-calc').onclick = () => this.calculateManual();
+    }
+    
     setupQuickTab() {
-        document.getElementById('opp-minus').addEventListener('click', () => { if (this.opponents > 1) document.getElementById('opp-value').textContent = --this.opponents; });
-        document.getElementById('opp-plus').addEventListener('click', () => { if (this.opponents < 9) document.getElementById('opp-value').textContent = ++this.opponents; });
-        document.getElementById('calc-btn').addEventListener('click', () => this.calculate());
-        document.getElementById('batch-btn').addEventListener('click', () => this.runBatch());
-        document.getElementById('clear-btn').addEventListener('click', () => { document.getElementById('hero-input').value = ''; document.getElementById('board-input').value = ''; document.getElementById('results-container').innerHTML = ''; });
+        document.getElementById('quick-opp-minus').onclick = () => {
+            if (this.quickOpponents > 1) document.getElementById('quick-opp-value').textContent = --this.quickOpponents;
+        };
+        document.getElementById('quick-opp-plus').onclick = () => {
+            if (this.quickOpponents < 9) document.getElementById('quick-opp-value').textContent = ++this.quickOpponents;
+        };
+        
+        document.getElementById('quick-calc').onclick = () => this.calculateQuick();
+        document.getElementById('quick-batch').onclick = () => this.calculateBatch();
     }
     
-    setupVisualTab() {
-        document.getElementById('visual-opp-minus').addEventListener('click', () => { if (this.visualOpponents > 1) document.getElementById('visual-opp-value').textContent = --this.visualOpponents; });
-        document.getElementById('visual-opp-plus').addEventListener('click', () => { if (this.visualOpponents < 9) document.getElementById('visual-opp-value').textContent = ++this.visualOpponents; });
-        document.getElementById('visual-mode-hero').addEventListener('click', () => { this.visualMode = 'hero'; document.getElementById('visual-mode-hero').classList.add('active'); document.getElementById('visual-mode-board').classList.remove('active'); });
-        document.getElementById('visual-mode-board').addEventListener('click', () => { this.visualMode = 'board'; document.getElementById('visual-mode-board').classList.add('active'); document.getElementById('visual-mode-hero').classList.remove('active'); });
-        document.getElementById('visual-clear').addEventListener('click', () => { this.visualHero = []; this.visualBoard = []; Object.values(this.cardButtons).forEach(b => b.classList.remove('hero', 'board')); document.getElementById('hero-display').textContent = 'Select 2'; document.getElementById('board-display').textContent = 'Optional'; });
-        document.getElementById('visual-calc-btn').addEventListener('click', () => this.calculateVisual());
-    }
-    
-    setupCameraTab() {
-        document.getElementById('camera-placeholder').addEventListener('click', () => this.startCamera());
-        document.getElementById('start-camera-btn').addEventListener('click', () => this.startCamera());
-        document.getElementById('auto-scan-btn').addEventListener('click', () => this.toggleAutoScan());
-        document.getElementById('switch-camera-btn').addEventListener('click', () => this.switchCamera());
-        document.getElementById('scan-opp-minus').addEventListener('click', () => { if (this.scanOpponents > 1) { document.getElementById('scan-opp-value').textContent = --this.scanOpponents; this.updateLiveEV(); } });
-        document.getElementById('scan-opp-plus').addEventListener('click', () => { if (this.scanOpponents < 9) { document.getElementById('scan-opp-value').textContent = ++this.scanOpponents; this.updateLiveEV(); } });
-        document.getElementById('scan-mode-hero').addEventListener('click', () => { this.scanMode = 'hero'; document.getElementById('scan-mode-hero').classList.add('active'); document.getElementById('scan-mode-board').classList.remove('active'); });
-        document.getElementById('scan-mode-board').addEventListener('click', () => { this.scanMode = 'board'; document.getElementById('scan-mode-board').classList.add('active'); document.getElementById('scan-mode-hero').classList.remove('active'); });
-        document.getElementById('scan-clear').addEventListener('click', () => this.clearScan());
-        document.getElementById('scan-calc-btn').addEventListener('click', () => this.calculateScan());
-    }
-    
-    buildCardGrid() {
-        const container = document.getElementById('card-grid-container');
+    buildQuickPicker(containerId, onClick) {
+        const container = document.getElementById(containerId);
         const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
-        const suits = ['s', 'h', 'd', 'c'];
-        let html = '<div class="card-grid"><div></div>';
-        for (const s of suits) html += `<div class="suit-label" style="color:${['h','d'].includes(s)?'var(--red-suit)':'var(--black-suit)'}">${SUIT_SYMBOLS[s]}</div>`;
-        for (const r of ranks) {
-            html += `<div class="rank-label">${r}</div>`;
-            for (const s of suits) html += `<button class="card-btn ${['h','d'].includes(s)?'red':'black'}" data-card="${r}${s}"><span class="rank">${r}</span><span class="suit">${SUIT_SYMBOLS[s]}</span></button>`;
-        }
-        html += '</div>';
-        container.innerHTML = html;
-        container.querySelectorAll('.card-btn').forEach(btn => { this.cardButtons[btn.dataset.card] = btn; btn.addEventListener('click', () => this.toggleVisualCard(btn.dataset.card)); });
-    }
-    
-    toggleVisualCard(code) {
-        const btn = this.cardButtons[code];
-        if (this.visualMode === 'hero') {
-            if (this.visualHero.includes(code)) { this.visualHero = this.visualHero.filter(c => c !== code); btn.classList.remove('hero'); }
-            else if (this.visualHero.length < 2 && !this.visualBoard.includes(code)) { this.visualHero.push(code); btn.classList.add('hero'); }
-        } else {
-            if (this.visualBoard.includes(code)) { this.visualBoard = this.visualBoard.filter(c => c !== code); btn.classList.remove('board'); }
-            else if (this.visualBoard.length < 5 && !this.visualHero.includes(code)) { this.visualBoard.push(code); btn.classList.add('board'); }
-        }
-        document.getElementById('hero-display').textContent = this.visualHero.length ? this.visualHero.map(c => `${c[0]}${SUIT_SYMBOLS[c[1]]}`).join(' ') : 'Select 2';
-        document.getElementById('board-display').textContent = this.visualBoard.length ? this.visualBoard.map(c => `${c[0]}${SUIT_SYMBOLS[c[1]]}`).join(' ') : 'Optional';
-    }
-    
-    buildQuickPicker() {
-        const container = document.getElementById('quick-card-picker');
-        const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
-        const suits = ['s', 'h', 'd', 'c'];
+        
         let html = '';
-        for (const s of suits) for (const r of ranks) html += `<button class="quick-pick-btn ${['h','d'].includes(s)?'red':'black'}" data-card="${r}${s}"><span class="qp-rank">${r}</span><span class="qp-suit">${SUIT_SYMBOLS[s]}</span></button>`;
+        for (const s of SUITS) {
+            for (const r of ranks) {
+                const code = r + s;
+                const color = ['h', 'd'].includes(s) ? 'red' : 'black';
+                html += `<button class="qp-btn ${color}" data-code="${code}">${r}<br>${SUIT_SYMBOLS[s]}</button>`;
+            }
+        }
         container.innerHTML = html;
-        container.querySelectorAll('.quick-pick-btn').forEach(btn => { this.quickPickButtons[btn.dataset.card] = btn; btn.addEventListener('click', () => this.toggleScanCard(btn.dataset.card)); });
+        
+        container.querySelectorAll('.qp-btn').forEach(btn => {
+            btn.onclick = () => onClick(btn.dataset.code, btn);
+        });
     }
     
-    toggleScanCard(code) {
-        const btn = this.quickPickButtons[code];
-        if (this.scanMode === 'hero') {
-            if (this.scanHero.includes(code)) { this.scanHero = this.scanHero.filter(c => c !== code); btn.classList.remove('hero'); }
-            else if (this.scanHero.length < 2 && !this.scanBoard.includes(code)) { this.scanHero.push(code); btn.classList.add('hero'); }
+    onQuickPickerClick(code, btn) {
+        if (this.pickMode === 'hero') {
+            if (this.heroCards.includes(code)) {
+                this.heroCards = this.heroCards.filter(c => c !== code);
+                btn.classList.remove('selected');
+            } else if (this.heroCards.length < 2 && !this.boardCards.includes(code)) {
+                this.heroCards.push(code);
+                btn.classList.add('selected');
+            }
         } else {
-            if (this.scanBoard.includes(code)) { this.scanBoard = this.scanBoard.filter(c => c !== code); btn.classList.remove('board'); }
-            else if (this.scanBoard.length < 5 && !this.scanHero.includes(code)) { this.scanBoard.push(code); btn.classList.add('board'); }
+            if (this.boardCards.includes(code)) {
+                this.boardCards = this.boardCards.filter(c => c !== code);
+                btn.classList.remove('board-selected');
+            } else if (this.boardCards.length < 5 && !this.heroCards.includes(code)) {
+                this.boardCards.push(code);
+                btn.classList.add('board-selected');
+            }
         }
-        this.updateScanDisplay();
-        this.updateLiveEV();
+        this.updateCardsDisplay();
+        this.updateEquity();
     }
     
-    updateScanDisplay() {
-        document.getElementById('scan-hero-display').textContent = this.scanHero.length ? this.scanHero.map(c => `${c[0]}${SUIT_SYMBOLS[c[1]]}`).join(' ') : '—';
-        document.getElementById('scan-board-display').textContent = this.scanBoard.length ? this.scanBoard.map(c => `${c[0]}${SUIT_SYMBOLS[c[1]]}`).join(' ') : '—';
-        this.updateRecognizedCards();
+    onManualPickerClick(code, btn) {
+        if (this.manualMode === 'hero') {
+            if (this.manualHero.includes(code)) {
+                this.manualHero = this.manualHero.filter(c => c !== code);
+            } else if (this.manualHero.length < 2 && !this.manualBoard.includes(code)) {
+                this.manualHero.push(code);
+            }
+        } else {
+            if (this.manualBoard.includes(code)) {
+                this.manualBoard = this.manualBoard.filter(c => c !== code);
+            } else if (this.manualBoard.length < 5 && !this.manualHero.includes(code)) {
+                this.manualBoard.push(code);
+            }
+        }
+        this.updateManualDisplay();
+        this.updateManualPicker();
     }
     
-    updateRecognizedCards() {
-        const container = document.getElementById('recognized-cards');
-        const all = [...this.scanHero, ...this.scanBoard];
-        if (all.length === 0) { container.innerHTML = '<div class="recognized-empty">Tap cards below to add</div>'; return; }
-        container.innerHTML = all.map(c => {
-            const isHero = this.scanHero.includes(c);
-            const color = ['h','d'].includes(c[1]) ? 'red' : 'black';
-            return `<div class="recognized-card ${color} ${isHero ? 'hero' : 'board'}">${c[0]}<br>${SUIT_SYMBOLS[c[1]]}</div>`;
-        }).join('');
+    updateManualPicker() {
+        document.querySelectorAll('#manual-picker .qp-btn').forEach(btn => {
+            const code = btn.dataset.code;
+            btn.classList.remove('selected', 'board-selected');
+            if (this.manualHero.includes(code)) btn.classList.add('selected');
+            if (this.manualBoard.includes(code)) btn.classList.add('board-selected');
+        });
     }
     
-    updateLiveEV() {
-        const liveResult = document.getElementById('live-result');
-        const liveEquity = document.getElementById('live-equity');
-        const liveCards = document.getElementById('live-cards');
-        const liveGto = document.getElementById('live-gto');
-        const scanEquity = document.getElementById('scan-equity-display');
+    updateManualDisplay() {
+        const heroEl = document.getElementById('manual-hero');
+        const boardEl = document.getElementById('manual-board');
         
-        if (this.scanHero.length !== 2) {
-            liveResult.classList.remove('show');
-            scanEquity.textContent = '—';
-            return;
-        }
+        heroEl.innerHTML = this.manualHero.length 
+            ? this.manualHero.map(c => this.renderCardChip(c)).join('')
+            : '<span class="cards-empty">Select 2</span>';
         
-        try {
-            const hero = this.scanHero.map(c => Card.fromString(c));
-            const board = this.scanBoard.map(c => Card.fromString(c));
-            const result = monteCarloEquity(hero, this.scanOpponents, board, 5000);
-            const gto = getGTOAdvice(hero);
-            
-            liveEquity.textContent = `${result.equity.toFixed(1)}%`;
-            liveCards.textContent = `${hero.map(c => c.toString()).join(' ')} vs ${this.scanOpponents} opp${this.scanBoard.length ? ' | ' + board.map(c => c.toString()).join(' ') : ''}`;
-            liveGto.textContent = `GTO: ${gto.action} (#${gto.ranking})`;
-            liveResult.classList.add('show');
-            
-            scanEquity.textContent = `${result.equity.toFixed(1)}%`;
-        } catch (e) {
-            liveResult.classList.remove('show');
-            scanEquity.textContent = '—';
-        }
-    }
-    
-    clearScan() {
-        this.scanHero = [];
-        this.scanBoard = [];
-        Object.values(this.quickPickButtons).forEach(b => b.classList.remove('hero', 'board'));
-        this.updateScanDisplay();
-        this.updateLiveEV();
-        document.getElementById('scan-status').textContent = 'Cleared. Tap cards to add.';
+        boardEl.innerHTML = this.manualBoard.length
+            ? this.manualBoard.map(c => this.renderCardChip(c)).join('')
+            : '<span class="cards-empty">Optional</span>';
     }
     
     async startCamera() {
         try {
-            if (this.cameraStream) this.cameraStream.getTracks().forEach(t => t.stop());
-            this.cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.facingMode, width: { ideal: 1280 }, height: { ideal: 720 } } });
-            document.getElementById('camera-video').srcObject = this.cameraStream;
+            if (this.cameraStream) {
+                this.cameraStream.getTracks().forEach(t => t.stop());
+            }
+            
+            this.cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: this.facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            
+            const video = document.getElementById('camera-video');
+            video.srcObject = this.cameraStream;
+            
             document.getElementById('camera-placeholder').classList.add('hidden');
-            document.getElementById('scan-status').textContent = 'Camera ready. Tap cards below to add.';
-            document.getElementById('scan-status').className = 'scan-status success';
+            this.updateStatus('Camera ready. Tap Detect or Auto', true);
+            
         } catch (e) {
             this.showToast('Camera access denied', true);
-            document.getElementById('scan-status').textContent = 'Camera denied. Use card picker below.';
+            this.updateStatus('Camera denied. Use manual picker.', false);
         }
     }
     
-    switchCamera() {
+    flipCamera() {
         this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
         if (this.cameraStream) this.startCamera();
     }
     
-    toggleAutoScan() {
-        this.autoScanActive = !this.autoScanActive;
-        const btn = document.getElementById('auto-scan-btn');
-        if (this.autoScanActive) {
+    detectOnce() {
+        if (!this.cameraStream) {
+            this.showToast('Start camera first', true);
+            return;
+        }
+        
+        const video = document.getElementById('camera-video');
+        const canvas = document.getElementById('detection-canvas');
+        
+        const startTime = performance.now();
+        const cards = this.detector.detect(video, canvas);
+        const elapsed = performance.now() - startTime;
+        
+        this.processDetectedCards(cards);
+        this.updateStatus(`Detected ${cards.length} cards (${elapsed.toFixed(0)}ms)`, cards.length > 0);
+        document.getElementById('status-fps').textContent = `${elapsed.toFixed(0)}ms`;
+    }
+    
+    toggleAutoDetect() {
+        this.autoDetect = !this.autoDetect;
+        const btn = document.getElementById('auto-btn');
+        
+        if (this.autoDetect) {
             btn.classList.add('recording');
-            btn.innerHTML = '<span class="btn-icon">⏹</span> Stop';
-            document.getElementById('scan-status').textContent = 'Auto-calculating EV...';
-            document.getElementById('scan-status').className = 'scan-status detecting';
+            btn.innerHTML = '<span class="btn-cam-icon">⏹</span><span>Stop</span>';
+            this.updateStatus('Auto-detecting...', true);
+            
+            this.autoInterval = setInterval(() => {
+                if (this.cameraStream) {
+                    const video = document.getElementById('camera-video');
+                    const canvas = document.getElementById('detection-canvas');
+                    const startTime = performance.now();
+                    const cards = this.detector.detect(video, canvas);
+                    const elapsed = performance.now() - startTime;
+                    
+                    this.processDetectedCards(cards);
+                    document.getElementById('status-fps').textContent = `${(1000/elapsed).toFixed(0)} FPS`;
+                }
+            }, 200); // 5 FPS
         } else {
             btn.classList.remove('recording');
-            btn.innerHTML = '<span class="btn-icon">◉</span> Auto';
-            document.getElementById('scan-status').textContent = 'Auto-scan stopped.';
-            document.getElementById('scan-status').className = 'scan-status';
+            btn.innerHTML = '<span class="btn-cam-icon">🔄</span><span>Auto</span>';
+            this.updateStatus('Auto-detect stopped', false);
+            
+            if (this.autoInterval) {
+                clearInterval(this.autoInterval);
+                this.autoInterval = null;
+            }
         }
     }
     
-    parseCards(str) {
-        str = str.replace(/\s/g, '');
-        const cards = [];
-        for (let i = 0; i < str.length; i += 2) if (i + 1 < str.length) cards.push(Card.fromString(str.substr(i, 2)));
-        return cards;
+    processDetectedCards(cards) {
+        // Add newly detected cards (avoid duplicates)
+        for (const card of cards) {
+            const code = card.code;
+            if (!this.detectedCards.includes(code) && !this.heroCards.includes(code) && !this.boardCards.includes(code)) {
+                // Auto-assign: first 2 to hero, next to board
+                if (this.heroCards.length < 2) {
+                    this.heroCards.push(code);
+                } else if (this.boardCards.length < 5) {
+                    this.boardCards.push(code);
+                }
+                this.detectedCards.push(code);
+            }
+        }
+        
+        this.updateCardsDisplay();
+        this.updateQuickPicker();
+        this.updateEquity();
+        this.updateDetectionBadges(cards);
     }
     
-    calculate() {
-        const heroStr = document.getElementById('hero-input').value.trim();
-        const boardStr = document.getElementById('board-input').value.trim();
-        if (!heroStr) { this.showToast('Enter hand cards', true); return; }
-        try {
-            const hero = this.parseCards(heroStr);
-            const board = boardStr ? this.parseCards(boardStr) : [];
-            if (hero.length !== 2) { this.showToast('Hand must be 2 cards', true); return; }
-            this.showLoading();
-            setTimeout(() => {
-                const result = monteCarloEquity(hero, this.opponents, board, 12000);
-                const gto = getGTOAdvice(hero);
-                this.showResult(hero, result, gto);
-            }, 50);
-        } catch (e) { this.showToast('Invalid format', true); }
+    updateDetectionBadges(cards) {
+        const container = document.getElementById('detection-status');
+        container.innerHTML = cards.map(c => {
+            const isHero = this.heroCards.includes(c.code);
+            return `<div class="detected-card-badge ${isHero ? '' : 'board'}">${c.rank}${SUIT_SYMBOLS[c.suit]}</div>`;
+        }).join('');
     }
     
-    calculateVisual() {
-        if (this.visualHero.length !== 2) { this.showToast('Select 2 hand cards', true); return; }
-        try {
-            const hero = this.visualHero.map(c => Card.fromString(c));
-            const board = this.visualBoard.map(c => Card.fromString(c));
-            this.showLoading();
-            setTimeout(() => {
-                const result = monteCarloEquity(hero, this.visualOpponents, board, 12000);
-                const gto = getGTOAdvice(hero);
-                this.showResult(hero, result, gto);
-            }, 50);
-        } catch (e) { this.showToast('Error', true); }
+    updateQuickPicker() {
+        document.querySelectorAll('#quick-picker .qp-btn').forEach(btn => {
+            const code = btn.dataset.code;
+            btn.classList.remove('selected', 'board-selected');
+            if (this.heroCards.includes(code)) btn.classList.add('selected');
+            if (this.boardCards.includes(code)) btn.classList.add('board-selected');
+        });
     }
     
-    calculateScan() {
-        if (this.scanHero.length !== 2) { this.showToast('Select 2 hand cards', true); return; }
-        try {
-            const hero = this.scanHero.map(c => Card.fromString(c));
-            const board = this.scanBoard.map(c => Card.fromString(c));
-            this.showLoading();
-            setTimeout(() => {
-                const result = monteCarloEquity(hero, this.scanOpponents, board, 12000);
-                const gto = getGTOAdvice(hero);
-                this.showResult(hero, result, gto);
-            }, 50);
-        } catch (e) { this.showToast('Error', true); }
+    clearDetected() {
+        this.detectedCards = [];
+        this.heroCards = [];
+        this.boardCards = [];
+        this.updateCardsDisplay();
+        this.updateQuickPicker();
+        this.updateEquity();
+        document.getElementById('detection-status').innerHTML = '';
+        document.getElementById('live-result').classList.remove('show');
+        document.getElementById('equity-display').style.display = 'none';
+        this.showToast('Cleared');
     }
     
-    runBatch() {
-        const heroStr = document.getElementById('hero-input').value.trim();
-        if (!heroStr) { this.showToast('Enter hand cards', true); return; }
-        try {
-            const hero = this.parseCards(heroStr);
-            if (hero.length !== 2) { this.showToast('Hand must be 2 cards', true); return; }
-            this.showLoading('Analyzing...');
-            setTimeout(() => {
-                const preflop = monteCarloEquity(hero, this.opponents, [], 8000);
-                const batch = batchAnalysis(hero, this.opponents);
-                const gto = getGTOAdvice(hero);
-                this.showBatchResult(hero, preflop, batch, gto);
-            }, 50);
-        } catch (e) { this.showToast('Invalid format', true); }
+    updateCardsDisplay() {
+        const heroEl = document.getElementById('hero-cards');
+        const boardEl = document.getElementById('board-cards');
+        
+        heroEl.innerHTML = this.heroCards.length
+            ? this.heroCards.map(c => this.renderCardChip(c, true)).join('')
+            : '<span class="cards-empty">Waiting...</span>';
+        
+        boardEl.innerHTML = this.boardCards.length
+            ? this.boardCards.map(c => this.renderCardChip(c, true)).join('')
+            : '<span class="cards-empty">Optional</span>';
     }
     
-    showLoading(text = 'Calculating...') {
-        document.getElementById('results-container').innerHTML = `<div class="results"><div class="loading"><div class="spinner"></div><div class="loading-text">${text}</div></div></div>`;
+    renderCardChip(code, removable = false) {
+        const rank = code[0];
+        const suit = code[1];
+        const isRed = ['h', 'd'].includes(suit);
+        const remove = removable ? `<span class="remove" onclick="app.removeCard('${code}')">×</span>` : '';
+        return `<span class="card-chip ${isRed ? 'red' : ''}">${rank}${SUIT_SYMBOLS[suit]}${remove}</span>`;
     }
     
-    showResult(hero, result, gto) {
-        document.getElementById('results-container').innerHTML = `
+    removeCard(code) {
+        this.heroCards = this.heroCards.filter(c => c !== code);
+        this.boardCards = this.boardCards.filter(c => c !== code);
+        this.detectedCards = this.detectedCards.filter(c => c !== code);
+        this.updateCardsDisplay();
+        this.updateQuickPicker();
+        this.updateEquity();
+    }
+    
+    updateEquity() {
+        if (this.heroCards.length !== 2) {
+            document.getElementById('live-result').classList.remove('show');
+            document.getElementById('equity-display').style.display = 'none';
+            return;
+        }
+        
+        const result = calculateEquity(this.heroCards, this.boardCards, this.opponents, 5000);
+        const gto = getGTO(this.heroCards);
+        
+        // Live overlay
+        document.getElementById('live-equity').textContent = `${result.equity.toFixed(1)}%`;
+        document.getElementById('live-cards').textContent = `${this.heroCards.map(c => c[0] + SUIT_SYMBOLS[c[1]]).join(' ')} vs ${this.opponents} opp`;
+        document.getElementById('live-gto').textContent = `GTO: ${gto.action} (#${gto.ranking})`;
+        document.getElementById('live-result').classList.add('show');
+        
+        // Main display
+        document.getElementById('equity-display').style.display = 'block';
+        document.getElementById('equity-value').textContent = `${result.equity.toFixed(1)}%`;
+        document.getElementById('equity-gto').textContent = `${gto.action} • Rank #${gto.ranking}/169`;
+    }
+    
+    updateStatus(text, active) {
+        document.getElementById('status-text').textContent = text;
+        const indicator = document.getElementById('status-indicator');
+        indicator.classList.toggle('active', active);
+    }
+    
+    calculateManual() {
+        if (this.manualHero.length !== 2) {
+            this.showToast('Select 2 hand cards', true);
+            return;
+        }
+        
+        const result = calculateEquity(this.manualHero, this.manualBoard, this.manualOpponents, 10000);
+        const gto = getGTO(this.manualHero);
+        
+        document.getElementById('manual-results').innerHTML = this.renderResults(this.manualHero, result, gto);
+    }
+    
+    calculateQuick() {
+        const heroStr = document.getElementById('quick-hero').value.trim().replace(/\s/g, '');
+        const boardStr = document.getElementById('quick-board').value.trim().replace(/\s/g, '');
+        
+        if (heroStr.length < 4) {
+            this.showToast('Enter hand cards', true);
+            return;
+        }
+        
+        const hero = [];
+        for (let i = 0; i < heroStr.length; i += 2) hero.push(heroStr.substr(i, 2));
+        
+        const board = [];
+        for (let i = 0; i < boardStr.length; i += 2) board.push(boardStr.substr(i, 2));
+        
+        if (hero.length !== 2) {
+            this.showToast('Hand must be 2 cards', true);
+            return;
+        }
+        
+        const result = calculateEquity(hero, board, this.quickOpponents, 10000);
+        const gto = getGTO(hero);
+        
+        document.getElementById('quick-results').innerHTML = this.renderResults(hero, result, gto);
+    }
+    
+    calculateBatch() {
+        const heroStr = document.getElementById('quick-hero').value.trim().replace(/\s/g, '');
+        if (heroStr.length < 4) {
+            this.showToast('Enter hand cards', true);
+            return;
+        }
+        
+        const hero = [];
+        for (let i = 0; i < heroStr.length; i += 2) hero.push(heroStr.substr(i, 2));
+        
+        document.getElementById('quick-results').innerHTML = '<div class="results"><div style="text-align:center;padding:30px"><div class="loader" style="margin:0 auto"></div><div style="margin-top:12px;color:var(--text-secondary)">Analyzing boards...</div></div></div>';
+        
+        setTimeout(() => {
+            const gto = getGTO(hero);
+            const preflop = calculateEquity(hero, [], this.quickOpponents, 8000);
+            
+            // Quick batch analysis
+            const batch = this.runBatch(hero, this.quickOpponents);
+            
+            let batchHtml = '';
+            for (const [type, data] of Object.entries(batch)) {
+                batchHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+                    <span>${type}</span>
+                    <span style="color:var(--success);font-weight:700">${data.avg.toFixed(1)}%</span>
+                </div>`;
+            }
+            
+            document.getElementById('quick-results').innerHTML = `
+                <div class="results">
+                    <div style="text-align:center;margin-bottom:16px">
+                        <div style="font-size:14px;color:var(--text-muted)">Preflop Equity</div>
+                        <div style="font-size:36px;font-weight:800;color:var(--success)">${preflop.equity.toFixed(1)}%</div>
+                        <div style="color:var(--warning)">${gto.action} • #${gto.ranking}</div>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">BY BOARD TEXTURE</div>
+                    ${batchHtml}
+                </div>`;
+        }, 100);
+    }
+    
+    runBatch(hero, opp) {
+        const heroCards = hero.map(c => Card.fromCode(c));
+        const used = new Set(hero);
+        const deck = createDeck().filter(c => !used.has(c.toCode()));
+        const hHigh = Math.max(heroCards[0].value, heroCards[1].value);
+        const hLow = Math.min(heroCards[0].value, heroCards[1].value);
+        const hSuits = new Set([heroCards[0].suit, heroCards[1].suit]);
+        
+        const results = { 'Top Pair': [], 'Low Pair': [], 'Flush Draw': [], 'Straight Draw': [], 'Dry Board': [] };
+        
+        for (let i = 0; i < 200; i++) {
+            const flop = shuffle(deck).slice(0, 3);
+            const flopCodes = flop.map(c => c.toCode());
+            const fv = flop.map(c => c.value);
+            const fs = flop.map(c => c.suit);
+            
+            const hiPair = fv.includes(hHigh);
+            const loPair = fv.includes(hLow) && !hiPair;
+            const sc = {}; for (const s of fs) sc[s] = (sc[s] || 0) + 1;
+            const fd = Object.entries(sc).some(([s, c]) => c >= 2 && hSuits.has(s));
+            const av = [...fv, hHigh, hLow].sort((a, b) => a - b);
+            let sd = false; for (let j = 0; j <= av.length - 4; j++) if (av[j + 3] - av[j] <= 4) { sd = true; break; }
+            
+            const eq = calculateEquity(hero, flopCodes, opp, 100);
+            
+            if (hiPair) results['Top Pair'].push(eq.equity);
+            else if (loPair) results['Low Pair'].push(eq.equity);
+            else if (fd) results['Flush Draw'].push(eq.equity);
+            else if (sd) results['Straight Draw'].push(eq.equity);
+            else results['Dry Board'].push(eq.equity);
+        }
+        
+        const summary = {};
+        for (const [k, v] of Object.entries(results)) {
+            if (v.length) summary[k] = { avg: v.reduce((a, b) => a + b, 0) / v.length, count: v.length };
+        }
+        return summary;
+    }
+    
+    renderResults(hero, result, gto) {
+        const heroStr = hero.map(c => c[0] + SUIT_SYMBOLS[c[1]]).join(' ');
+        return `
             <div class="results">
-                <div class="result-header"><div class="result-hand">${hero.map(c => c.toString()).join(' ')}</div><div class="result-type">${gto.category}</div></div>
-                <div class="equity-display"><div class="equity-value">${result.equity.toFixed(1)}%</div><div class="equity-label">Total Equity</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <span style="font-size:18px;font-weight:700">${heroStr}</span>
+                    <span style="font-size:12px;background:var(--bg-elevated);padding:4px 8px;border-radius:4px">${gto.category}</span>
+                </div>
+                <div style="text-align:center;padding:16px 0">
+                    <div style="font-size:42px;font-weight:800;color:var(--success)">${result.equity.toFixed(1)}%</div>
+                    <div style="font-size:12px;color:var(--text-muted)">Equity</div>
+                </div>
                 <div class="stats-grid">
                     <div class="stat-box"><div class="stat-value win">${result.win.toFixed(1)}%</div><div class="stat-label">Win</div></div>
                     <div class="stat-box"><div class="stat-value tie">${result.tie.toFixed(1)}%</div><div class="stat-label">Tie</div></div>
                     <div class="stat-box"><div class="stat-value lose">${result.lose.toFixed(1)}%</div><div class="stat-label">Lose</div></div>
                 </div>
-                <div class="gto-section"><div class="gto-title">GTO ADVICE</div><div class="gto-advice"><div class="gto-action">${gto.action}</div><div class="gto-rank">Rank #${gto.ranking}/169</div></div></div>
-            </div>`;
-    }
-    
-    showBatchResult(hero, preflop, batch, gto) {
-        let rows = '';
-        for (const [k, v] of Object.entries(batch)) rows += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>${k}</span><span style="color:var(--success);font-weight:700">${v.avg.toFixed(1)}%</span></div>`;
-        document.getElementById('results-container').innerHTML = `
-            <div class="results">
-                <div class="result-header"><div class="result-hand">${hero.map(c => c.toString()).join(' ')}</div><div class="result-type">${gto.category}</div></div>
-                <div class="equity-display"><div class="equity-value">${preflop.equity.toFixed(1)}%</div><div class="equity-label">Preflop Equity</div></div>
-                <div class="gto-section" style="margin-bottom:16px"><div class="gto-title">GTO</div><div class="gto-advice"><div class="gto-action">${gto.action}</div><div class="gto-rank">#${gto.ranking}</div></div></div>
-                <div class="section-title">BY BOARD TYPE</div>${rows}
+                <div style="background:var(--bg-elevated);padding:10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center">
+                    <span style="color:var(--warning);font-weight:600">${gto.action}</span>
+                    <span style="color:var(--text-muted)">Rank #${gto.ranking}/169</span>
+                </div>
             </div>`;
     }
     
@@ -469,4 +695,8 @@ class PokerApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => new PokerApp());
+// Global instance
+let app;
+document.addEventListener('DOMContentLoaded', () => {
+    app = new PokerAI();
+});

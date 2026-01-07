@@ -1,367 +1,184 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Poker Calc">
-    <meta name="theme-color" content="#0a0a0f">
-    <title>Poker Equity Calculator</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-card: #1a1a24;
-            --bg-elevated: #22222e;
-            --accent: #6366f1;
-            --accent-light: #818cf8;
-            --accent-glow: rgba(99, 102, 241, 0.3);
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --text-primary: #ffffff;
-            --text-secondary: #a1a1aa;
-            --text-muted: #52525b;
-            --border: #27272a;
-            --red-suit: #ef4444;
-            --black-suit: #e4e4e7;
-            --safe-top: env(safe-area-inset-top);
-            --safe-bottom: env(safe-area-inset-bottom);
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-            padding-top: var(--safe-top);
-            padding-bottom: var(--safe-bottom);
-        }
-        
-        .app { max-width: 500px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
-        
-        .header { padding: 16px 20px; background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%); position: sticky; top: 0; z-index: 100; }
-        .header h1 { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .header-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-        
-        .tab-bar { display: flex; gap: 6px; padding: 0 16px; margin-bottom: 16px; }
-        .tab-btn { flex: 1; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 4px 15px var(--accent-glow); }
-        
-        .content { flex: 1; padding: 0 16px 100px; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .section { background: var(--bg-card); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1px solid var(--border); }
-        .section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-        
-        .input-group { margin-bottom: 14px; }
-        .input-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; display: block; }
-        .input-field { width: 100%; padding: 12px 14px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 16px; font-family: 'SF Mono', Monaco, monospace; outline: none; }
-        .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-        .input-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-        
-        .stepper { display: flex; align-items: center; gap: 14px; }
-        .stepper-btn { width: 40px; height: 40px; border-radius: 10px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .stepper-btn:active { transform: scale(0.95); background: var(--accent); }
-        .stepper-value { font-size: 22px; font-weight: 700; min-width: 36px; text-align: center; }
-        
-        .btn-primary { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%); border: none; border-radius: 12px; color: white; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px var(--accent-glow); }
-        .btn-primary:active { transform: scale(0.98); }
-        .btn-secondary { padding: 10px 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 14px; font-weight: 500; cursor: pointer; }
-        .btn-secondary:active { background: var(--border); }
-        
-        /* Camera Styles */
-        .camera-container { position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
-        #camera-video { width: 100%; height: 100%; object-fit: cover; }
-        #camera-canvas, #overlay-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        #camera-canvas { display: none; }
-        #overlay-canvas { pointer-events: none; }
-        
-        .camera-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
-        .scan-region { position: absolute; top: 10%; left: 8%; right: 8%; bottom: 10%; border: 2px solid rgba(99, 102, 241, 0.4); border-radius: 12px; }
-        .scan-corner { position: absolute; width: 20px; height: 20px; border-color: var(--accent); border-style: solid; }
-        .scan-corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
-        .scan-corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
-        .scan-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
-        .scan-corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
-        
-        .scan-line { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: scanMove 2s ease-in-out infinite; }
-        @keyframes scanMove { 0%, 100% { top: 10%; opacity: 0.5; } 50% { top: 85%; opacity: 1; } }
-        
-        .camera-placeholder { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-elevated); color: var(--text-muted); font-size: 13px; cursor: pointer; }
-        .camera-placeholder.hidden { display: none; }
-        .camera-icon { font-size: 40px; margin-bottom: 10px; }
-        
-        .live-result { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); border-radius: 10px; padding: 12px; display: none; }
-        .live-result.show { display: block; animation: slideUp 0.3s ease; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .live-equity { font-size: 28px; font-weight: 800; color: var(--success); text-align: center; }
-        .live-cards { font-size: 14px; color: var(--text-secondary); text-align: center; margin-top: 4px; }
-        .live-gto { font-size: 12px; color: var(--warning); text-align: center; margin-top: 4px; }
-        
-        .camera-controls { display: flex; gap: 8px; margin-bottom: 10px; }
-        .btn-camera { flex: 1; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .btn-camera:active { background: var(--border); }
-        .btn-camera.active { background: var(--success); border-color: var(--success); }
-        .btn-camera.recording { background: var(--danger); border-color: var(--danger); animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-        .btn-icon { font-size: 14px; }
-        
-        .scan-status { text-align: center; font-size: 13px; color: var(--text-secondary); padding: 10px; background: var(--bg-elevated); border-radius: 8px; margin-bottom: 12px; }
-        .scan-status.detecting { color: var(--warning); }
-        .scan-status.success { color: var(--success); }
-        
-        .detected-cards-bar { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--bg-elevated); border-radius: 10px; margin-bottom: 12px; }
-        .detected-section { flex: 1; }
-        .detected-label { font-size: 10px; color: var(--text-muted); display: block; }
-        .detected-cards { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-        .detected-equity { font-size: 24px; font-weight: 800; color: var(--success); min-width: 70px; text-align: right; }
-        
-        .recognized-cards { display: flex; flex-wrap: wrap; gap: 6px; min-height: 50px; padding: 10px; background: var(--bg-elevated); border-radius: 8px; margin-bottom: 12px; }
-        .recognized-empty { color: var(--text-muted); font-size: 13px; width: 100%; text-align: center; padding: 8px; }
-        .recognized-card { display: flex; align-items: center; justify-content: center; width: 42px; height: 56px; background: white; border-radius: 5px; font-size: 14px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; flex-direction: column; }
-        .recognized-card:active { transform: scale(0.95); }
-        .recognized-card.red { color: var(--red-suit); }
-        .recognized-card.black { color: #1a1a24; }
-        .recognized-card.hero { outline: 2px solid var(--accent); outline-offset: 2px; }
-        .recognized-card.board { outline: 2px solid var(--success); outline-offset: 2px; }
-        
-        .mode-selector { display: flex; gap: 8px; margin-bottom: 12px; }
-        .mode-btn { flex: 1; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; }
-        .mode-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
-        
-        .quick-card-picker { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; }
-        .quick-pick-btn { aspect-ratio: 0.75; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-elevated); font-size: 9px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1px; }
-        .quick-pick-btn:active { transform: scale(0.9); }
-        .quick-pick-btn.red { color: var(--red-suit); }
-        .quick-pick-btn.black { color: var(--black-suit); }
-        .quick-pick-btn.hero { background: var(--accent); color: white; border-color: var(--accent); }
-        .quick-pick-btn.board { background: var(--success); color: white; border-color: var(--success); }
-        .qp-rank { font-size: 10px; line-height: 1; }
-        .qp-suit { font-size: 9px; line-height: 1; }
-        
-        .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-        .suit-label { font-size: 18px; text-align: center; padding: 6px; }
-        .rank-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; }
-        .card-btn { aspect-ratio: 1; border-radius: 6px; background: var(--bg-elevated); border: 1px solid var(--border); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1px; }
-        .card-btn .rank { font-size: 14px; font-weight: 700; }
-        .card-btn .suit { font-size: 11px; }
-        .card-btn.red { color: var(--red-suit); }
-        .card-btn.black { color: var(--black-suit); }
-        .card-btn.hero { background: var(--accent); color: white; border-color: var(--accent); }
-        .card-btn.board { background: var(--success); color: white; border-color: var(--success); }
-        .card-btn:active { transform: scale(0.95); }
-        
-        .format-ref { background: var(--bg-elevated); border-radius: 10px; padding: 12px; margin-top: 14px; }
-        .format-title { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
-        .format-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 12px; }
-        .format-item { color: var(--text-secondary); }
-        .format-item span { color: var(--text-primary); font-weight: 600; font-family: 'SF Mono', monospace; }
-        
-        .results { background: var(--bg-card); border-radius: 14px; padding: 16px; border: 1px solid var(--border); }
-        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .result-hand { font-size: 18px; font-weight: 700; }
-        .result-type { font-size: 13px; color: var(--text-secondary); background: var(--bg-elevated); padding: 4px 8px; border-radius: 5px; }
-        .equity-display { text-align: center; padding: 20px 0; margin-bottom: 16px; }
-        .equity-value { font-size: 48px; font-weight: 800; background: linear-gradient(135deg, var(--success) 0%, #86efac 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .equity-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-        .stat-box { background: var(--bg-elevated); border-radius: 10px; padding: 12px; text-align: center; }
-        .stat-value { font-size: 20px; font-weight: 700; }
-        .stat-value.win { color: var(--success); }
-        .stat-value.tie { color: var(--warning); }
-        .stat-value.lose { color: var(--danger); }
-        .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-        .gto-section { background: var(--bg-elevated); border-radius: 10px; padding: 12px; }
-        .gto-title { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
-        .gto-advice { display: flex; justify-content: space-between; align-items: center; }
-        .gto-action { font-size: 15px; font-weight: 600; color: var(--warning); }
-        .gto-rank { font-size: 13px; color: var(--text-secondary); }
-        
-        .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 0; }
-        .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text { margin-top: 14px; color: var(--text-secondary); font-size: 14px; }
-        
-        .toast { position: fixed; bottom: calc(80px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg-elevated); border: 1px solid var(--border); padding: 12px 20px; border-radius: 10px; font-size: 14px; color: var(--text-primary); opacity: 0; transition: all 0.3s ease; z-index: 1000; }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast.error { border-color: var(--danger); color: var(--danger); }
-        .toast.success { border-color: var(--success); color: var(--success); }
+12px;font-weight:700;display:flex;align-items:center;gap:2px}
+        .card-chip.red{color:var(--red-suit)}
+        .card-chip .remove{margin-left:4px;opacity:.5;cursor:pointer}
+        .cards-empty{color:var(--text-muted);font-size:12px}
+        .equity-big{text-align:center;padding:16px;background:linear-gradient(135deg,var(--bg-elevated),var(--bg-card));border-radius:12px;margin-bottom:10px}
+        .equity-value{font-size:48px;font-weight:800;background:linear-gradient(135deg,var(--success),#86efac);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .equity-label{font-size:12px;color:var(--text-muted)}
+        .equity-gto{font-size:14px;color:var(--warning);margin-top:4px}
+        .stepper-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+        .stepper-label{font-size:13px;color:var(--text-secondary)}
+        .stepper{display:flex;align-items:center;gap:12px}
+        .stepper-btn{width:36px;height:36px;border-radius:8px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-primary);font-size:20px;cursor:pointer}
+        .stepper-btn:active{background:var(--accent)}
+        .stepper-value{font-size:20px;font-weight:700;min-width:30px;text-align:center}
+        .quick-picker{display:grid;grid-template-columns:repeat(13,1fr);gap:2px}
+        .qp-btn{aspect-ratio:.7;border:1px solid var(--border);border-radius:3px;background:var(--bg-elevated);font-size:8px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+        .qp-btn:active{transform:scale(.9)}
+        .qp-btn.red{color:var(--red-suit)}
+        .qp-btn.black{color:var(--black-suit)}
+        .qp-btn.selected{background:var(--accent);color:white;border-color:var(--accent)}
+        .qp-btn.board-selected{background:var(--success);color:white;border-color:var(--success)}
+        .mode-toggle{display:flex;gap:6px;margin-bottom:8px}
+        .mode-btn{flex:1;padding:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:11px;font-weight:600;cursor:pointer}
+        .mode-btn.active{background:var(--accent);border-color:var(--accent);color:white}
+        .btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-light));border:none;border-radius:10px;color:white;font-size:15px;font-weight:600;cursor:pointer}
+        .btn-primary:active{transform:scale(.98)}
+        .model-loading{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000}
+        .model-loading.hidden{display:none}
+        .loader{width:50px;height:50px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading-text{margin-top:16px;color:var(--text-secondary);font-size:14px}
+        .loading-progress{width:200px;height:4px;background:var(--border);border-radius:2px;margin-top:12px;overflow:hidden}
+        .loading-bar{height:100%;background:var(--accent);width:0%;transition:width .3s}
+        .toast{position:fixed;bottom:calc(60px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg-elevated);border:1px solid var(--border);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:all .3s;z-index:1000}
+        .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+        .toast.error{border-color:var(--danger);color:var(--danger)}
+        .toast.success{border-color:var(--success);color:var(--success)}
+        .results{background:var(--bg-card);border-radius:12px;padding:14px;border:1px solid var(--border);margin-top:12px}
+        .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+        .stat-box{background:var(--bg-elevated);border-radius:8px;padding:10px;text-align:center}
+        .stat-value{font-size:18px;font-weight:700}
+        .stat-value.win{color:var(--success)}
+        .stat-value.tie{color:var(--warning)}
+        .stat-value.lose{color:var(--danger)}
+        .stat-label{font-size:10px;color:var(--text-muted)}
     </style>
 </head>
 <body>
+    <div class="model-loading" id="model-loading">
+        <div class="loader"></div>
+        <div class="loading-text" id="loading-text">Loading AI Model...</div>
+        <div class="loading-progress"><div class="loading-bar" id="loading-bar"></div></div>
+    </div>
     <div class="app">
         <header class="header">
-            <h1>Poker Calculator</h1>
-            <div class="header-subtitle">Texas Hold'em Equity & GTO</div>
+            <h1>Poker AI</h1>
+            <span class="header-badge">ML Recognition</span>
         </header>
-        
         <div class="tab-bar">
-            <button class="tab-btn active" data-tab="quick">Quick</button>
-            <button class="tab-btn" data-tab="visual">Select</button>
-            <button class="tab-btn" data-tab="camera">📷 Scan</button>
+            <button class="tab-btn active" data-tab="scan">📷 AI Scan</button>
+            <button class="tab-btn" data-tab="manual">Manual</button>
+            <button class="tab-btn" data-tab="quick">Quick</button>
         </div>
-        
         <main class="content">
-            <!-- Quick Tab -->
-            <div id="quick-tab" class="tab-content active">
+            <div id="scan-tab" class="tab-content active">
                 <div class="section">
-                    <div class="section-title">Hand Input</div>
-                    <div class="input-group">
-                        <label class="input-label">Your Hand</label>
-                        <input type="text" class="input-field" id="hero-input" placeholder="AsKh" autocomplete="off" autocapitalize="off">
-                        <div class="input-hint">Enter 2 cards (e.g., AsKh, TdTc)</div>
+                    <div class="camera-container">
+                        <video id="camera-video" autoplay playsinline muted></video>
+                        <canvas id="detection-canvas"></canvas>
+                        <div class="camera-overlay"><div class="scan-guide"></div></div>
+                        <div class="camera-placeholder" id="camera-placeholder">
+                            <div class="camera-icon">📷</div>
+                            <div>Tap to start AI recognition</div>
+                        </div>
+                        <div class="detection-status" id="detection-status"></div>
+                        <div class="live-result" id="live-result">
+                            <div class="live-equity" id="live-equity">—</div>
+                            <div class="live-cards" id="live-cards">Detecting cards...</div>
+                            <div class="live-gto" id="live-gto"></div>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label class="input-label">Opponents</label>
+                    <div class="camera-controls">
+                        <button class="btn-cam" id="start-btn"><span class="btn-cam-icon">▶️</span><span>Start</span></button>
+                        <button class="btn-cam" id="detect-btn"><span class="btn-cam-icon">🔍</span><span>Detect</span></button>
+                        <button class="btn-cam" id="auto-btn"><span class="btn-cam-icon">🔄</span><span>Auto</span></button>
+                        <button class="btn-cam" id="flip-btn"><span class="btn-cam-icon">🔁</span><span>Flip</span></button>
+                    </div>
+                    <div class="status-bar">
+                        <div class="status-indicator" id="status-indicator"></div>
+                        <div class="status-text" id="status-text">Tap Start to begin</div>
+                        <div class="status-fps" id="status-fps"></div>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title"><span>Detected Cards</span><button class="btn-cam" style="padding:4px 10px;flex:0" id="clear-detected">Clear</button></div>
+                    <div class="cards-row">
+                        <div class="cards-group">
+                            <div class="cards-label">HAND (first 2)</div>
+                            <div class="cards-display hero" id="hero-cards"><span class="cards-empty">Waiting...</span></div>
+                        </div>
+                        <div class="cards-group">
+                            <div class="cards-label">BOARD (next 3-5)</div>
+                            <div class="cards-display board" id="board-cards"><span class="cards-empty">Optional</span></div>
+                        </div>
+                    </div>
+                    <div class="stepper-row">
+                        <span class="stepper-label">Opponents</span>
                         <div class="stepper">
                             <button class="stepper-btn" id="opp-minus">−</button>
                             <span class="stepper-value" id="opp-value">2</span>
                             <button class="stepper-btn" id="opp-plus">+</button>
                         </div>
                     </div>
-                    <div class="input-group">
-                        <label class="input-label">Board (Optional)</label>
-                        <input type="text" class="input-field" id="board-input" placeholder="Flop, Turn, River" autocomplete="off" autocapitalize="off">
-                    </div>
                 </div>
-                <button class="btn-primary" id="calc-btn">Calculate Equity</button>
-                <div style="display: flex; gap: 8px; margin-top: 10px;">
-                    <button class="btn-secondary" style="flex: 1;" id="batch-btn">Batch Analysis</button>
-                    <button class="btn-secondary" style="flex: 1;" id="clear-btn">Clear</button>
+                <div class="equity-big" id="equity-display" style="display:none">
+                    <div class="equity-value" id="equity-value">—</div>
+                    <div class="equity-label">Equity</div>
+                    <div class="equity-gto" id="equity-gto"></div>
                 </div>
-                <div class="format-ref">
-                    <div class="format-title">CARD FORMAT</div>
-                    <div class="format-grid">
-                        <div class="format-item"><span>A K Q J T 9-2</span> Rank</div>
-                        <div class="format-item"><span>s h d c</span> Suit</div>
-                        <div class="format-item"><span>As</span> = A♠</div>
-                        <div class="format-item"><span>Kh</span> = K♥</div>
+                <div class="section">
+                    <div class="section-title">Quick Add (if AI misses)</div>
+                    <div class="mode-toggle">
+                        <button class="mode-btn active" id="mode-hero">Hand</button>
+                        <button class="mode-btn" id="mode-board">Board</button>
                     </div>
+                    <div class="quick-picker" id="quick-picker"></div>
                 </div>
             </div>
-            
-            <!-- Visual Tab -->
-            <div id="visual-tab" class="tab-content">
+            <div id="manual-tab" class="tab-content">
                 <div class="section">
                     <div class="section-title">Select Cards</div>
-                    <div class="detected-cards-bar">
-                        <div class="detected-section">
-                            <span class="detected-label">HAND</span>
-                            <span class="detected-cards" id="hero-display">Select 2</span>
+                    <div class="cards-row">
+                        <div class="cards-group">
+                            <div class="cards-label">HAND</div>
+                            <div class="cards-display hero" id="manual-hero"><span class="cards-empty">Select 2</span></div>
                         </div>
-                        <div class="detected-section">
-                            <span class="detected-label">BOARD</span>
-                            <span class="detected-cards" id="board-display">Optional</span>
+                        <div class="cards-group">
+                            <div class="cards-label">BOARD</div>
+                            <div class="cards-display board" id="manual-board"><span class="cards-empty">Optional</span></div>
                         </div>
                     </div>
-                    <div class="mode-selector">
-                        <button class="mode-btn active" data-mode="hero" id="visual-mode-hero">Hand (2)</button>
-                        <button class="mode-btn" data-mode="board" id="visual-mode-board">Board (0-5)</button>
-                        <button class="mode-btn" data-mode="clear" id="visual-clear">Clear</button>
+                    <div class="mode-toggle">
+                        <button class="mode-btn active" id="manual-mode-hero">Hand (2)</button>
+                        <button class="mode-btn" id="manual-mode-board">Board (0-5)</button>
+                        <button class="mode-btn" id="manual-clear">Clear</button>
                     </div>
-                    <div class="input-group">
-                        <label class="input-label">Opponents</label>
+                    <div class="stepper-row">
+                        <span class="stepper-label">Opponents</span>
                         <div class="stepper">
-                            <button class="stepper-btn" id="visual-opp-minus">−</button>
-                            <span class="stepper-value" id="visual-opp-value">2</span>
-                            <button class="stepper-btn" id="visual-opp-plus">+</button>
+                            <button class="stepper-btn" id="manual-opp-minus">−</button>
+                            <span class="stepper-value" id="manual-opp-value">2</span>
+                            <button class="stepper-btn" id="manual-opp-plus">+</button>
                         </div>
                     </div>
-                    <div id="card-grid-container"></div>
+                    <div class="quick-picker" id="manual-picker"></div>
                 </div>
-                <button class="btn-primary" id="visual-calc-btn">Calculate Equity</button>
+                <button class="btn-primary" id="manual-calc">Calculate Equity</button>
+                <div id="manual-results"></div>
             </div>
-            
-            <!-- Camera Tab -->
-            <div id="camera-tab" class="tab-content">
+            <div id="quick-tab" class="tab-content">
                 <div class="section">
-                    <div class="section-title">Camera Scanner</div>
-                    <div class="camera-container" id="camera-container">
-                        <video id="camera-video" autoplay playsinline muted></video>
-                        <canvas id="camera-canvas"></canvas>
-                        <canvas id="overlay-canvas"></canvas>
-                        <div class="camera-overlay">
-                            <div class="scan-region">
-                                <div class="scan-corner tl"></div>
-                                <div class="scan-corner tr"></div>
-                                <div class="scan-corner bl"></div>
-                                <div class="scan-corner br"></div>
-                                <div class="scan-line"></div>
-                            </div>
-                        </div>
-                        <div class="camera-placeholder" id="camera-placeholder">
-                            <div class="camera-icon">📷</div>
-                            <div>Tap to start camera</div>
-                        </div>
-                        <div class="live-result" id="live-result">
-                            <div class="live-equity" id="live-equity">—</div>
-                            <div class="live-cards" id="live-cards">Add cards to calculate</div>
-                            <div class="live-gto" id="live-gto"></div>
-                        </div>
-                    </div>
-                    <div class="camera-controls">
-                        <button class="btn-camera" id="start-camera-btn"><span class="btn-icon">▶</span> Start</button>
-                        <button class="btn-camera" id="auto-scan-btn"><span class="btn-icon">◉</span> Auto</button>
-                        <button class="btn-camera" id="switch-camera-btn"><span class="btn-icon">⟲</span> Flip</button>
-                    </div>
-                    <div class="scan-status" id="scan-status">Tap Start to begin scanning</div>
-                    <div class="detected-cards-bar">
-                        <div class="detected-section">
-                            <span class="detected-label">HAND</span>
-                            <span class="detected-cards" id="scan-hero-display">—</span>
-                        </div>
-                        <div class="detected-section">
-                            <span class="detected-label">BOARD</span>
-                            <span class="detected-cards" id="scan-board-display">—</span>
-                        </div>
-                        <div class="detected-equity" id="scan-equity-display">—</div>
-                    </div>
-                </div>
-                
-                <div class="section">
-                    <div class="section-title">Detected Cards (tap to toggle)</div>
-                    <div class="recognized-cards" id="recognized-cards">
-                        <div class="recognized-empty">Tap cards below to add</div>
-                    </div>
-                    <div class="mode-selector">
-                        <button class="mode-btn active" data-mode="hero" id="scan-mode-hero">Hand (2)</button>
-                        <button class="mode-btn" data-mode="board" id="scan-mode-board">Board (0-5)</button>
-                        <button class="mode-btn" data-mode="clear" id="scan-clear">Clear</button>
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Opponents</label>
+                    <div class="section-title">Text Input</div>
+                    <input type="text" id="quick-hero" placeholder="Hand: AsKh" style="width:100%;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:white;font-size:16px;margin-bottom:10px">
+                    <input type="text" id="quick-board" placeholder="Board: TdJdQd (optional)" style="width:100%;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:white;font-size:16px;margin-bottom:10px">
+                    <div class="stepper-row">
+                        <span class="stepper-label">Opponents</span>
                         <div class="stepper">
-                            <button class="stepper-btn" id="scan-opp-minus">−</button>
-                            <span class="stepper-value" id="scan-opp-value">2</span>
-                            <button class="stepper-btn" id="scan-opp-plus">+</button>
+                            <button class="stepper-btn" id="quick-opp-minus">−</button>
+                            <span class="stepper-value" id="quick-opp-value">2</span>
+                            <button class="stepper-btn" id="quick-opp-plus">+</button>
                         </div>
                     </div>
                 </div>
-                
-                <div class="section">
-                    <div class="section-title">Quick Select Cards</div>
-                    <div class="quick-card-picker" id="quick-card-picker"></div>
-                </div>
-                
-                <button class="btn-primary" id="scan-calc-btn">Show Full Results</button>
+                <button class="btn-primary" id="quick-calc">Calculate</button>
+                <button class="btn-primary" id="quick-batch" style="margin-top:8px;background:var(--bg-elevated)">Batch Analysis</button>
+                <div id="quick-results"></div>
             </div>
-            
-            <div id="results-container" style="margin-top: 16px;"></div>
         </main>
     </div>
-    
     <div class="toast" id="toast"></div>
-    
+    <script src="card-detector.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
