@@ -1,168 +1,132 @@
-# Poker AI - 高级卡片识别 & 权益计算器
+# Poker AI - Texas Hold'em Calculator
 
-基于机器学习的扑克实时卡片识别和权益分析工具。
+🎴 AI-powered poker equity calculator with real-time card recognition.
 
-## 🎯 核心特性
+## ✨ Features
 
-### 🤖 多层级卡片识别系统
-- **ML 检测器** (TensorFlow.js + COCO-SSD): 深度学习模型，性能最优
-- **改进检测器**: 支持自适应阈值处理，适应各种光照条件
-- **传统检测器**: 轻量级备选方案，确保兼容性
+- **🤖 AI Card Detection** - Computer vision-based playing card recognition
+- **📷 Camera Support** - Works with phone and webcam
+- **⚡ Real-time EV** - Instant equity calculation
+- **🎯 GTO Advice** - Preflop hand rankings and recommendations
+- **📊 Batch Analysis** - Analyze equity across different board textures
+- **📱 Cross-Platform** - Mobile (iOS/Android) and Desktop (Windows/Mac/Linux)
+- **🔒 Offline** - Works without internet after first load
 
-### 📸 智能光照适配
-- **CLAHE** (对比度受限自适应直方图均衡化)：改善低光和高光条件
-- **自适应阈值处理**：自动调整识别阈值，适应不同环境
-- **多通道图像处理**：RGB 和灰度混合分析
+## 🚀 Quick Start
 
-### ⚡ 实时识别功能
-- 自动卡片检测和分类
-- 实时权益计算
-- 自动模式：5 FPS 连续扫描
-- 置信度评分显示
+### Online Demo
+Host on GitHub Pages or any static hosting.
 
-### 🎓 GTO 建议
-- 手牌等级排名 (1-169)
-- 建议动作 (跟注/加注/弃牌)
-- 权益百分比展示
+### Local Testing
+```bash
+# Python
+python3 -m http.server 8000
 
-### 📱 PWA 应用
-- 支持离线使用
-- 可安装到手机主屏幕
-- 响应式设计，移动端优化
+# Node.js  
+npx serve .
 
-## 🚀 使用方法
-
-### 基础使用
-1. 打开应用 (Safari/Chrome)
-2. 点击 "📷 AI Scan" 标签页
-3. 点击 "▶️ Start" 启动摄像头
-4. 将手机对准扑克牌
-5. 点击 "🔍 Detect" 进行一次检测，或启用 "🔄 Auto" 持续扫描
-6. 检测到卡片后，权益会自动计算显示
-
-### 高级技巧
-- **改进光照**: 若识别率低，请调整光线或背景
-- **卡片位置**: 保持卡片平直且完全可见
-- **清除错误**: 点击 "Clear" 按钮清除误识别的卡片
-- **手动修正**: 若 AI 识别错误，使用 "Quick Add" 手动补正
-
-## 📊 识别性能对比
-
-### 检测器性能指标
-
-| 检测器 | 识别准确率 | 速度 | 内存占用 | 光照适应性 |
-|--------|----------|------|---------|----------|
-| ML    | 90-95%   | 中等 | 较高    | 优秀    |
-| Improved | 80-90%  | 快  | 低     | 很好    |
-| Traditional | 70-80% | 快 | 低     | 一般    |
-
-## 🌟 改进亮点
-
-### 1. 深度学习模型集成
-- TensorFlow.js 实现客户端推理
-- COCO-SSD 对象检测模型
-- 轻量级 CNN 进行卡片分类
-- 无需服务器，完全离线处理
-
-### 2. 自适应图像处理
-```
-输入图像 → 灰度转换 → CLAHE增强 → 自适应二值化 
-  → 边界检测 → 区域合并 → 特征提取 → 分类
+# Then open http://localhost:8000
 ```
 
-### 3. 智能等级和花色识别
-- **等级识别**: 基于像素密度特征向量匹配
-- **花色识别**: 结合颜色分析和形状学习
-- **置信度评分**: 每个识别结果带有可信度值
+## 📱 Mobile Installation
 
-### 4. 实时性能优化
-- 帧缓存和结果平滑
-- 低延迟检测（<100ms）
-- 5+ FPS 连续扫描能力
+### iPhone (Safari)
+1. Open the app URL in Safari
+2. Tap Share button (□↑)
+3. Tap "Add to Home Screen"
+4. Tap "Add"
 
-## 📋 技术栈
+### Android (Chrome)
+1. Open the app URL in Chrome
+2. Tap menu (⋮)
+3. Tap "Install app" or "Add to Home screen"
 
-### 前端框架
-- 原生 JavaScript (无框架依赖)
-- HTML5 Canvas 用于视频处理
-- CSS3 响应式设计
+## 💻 Desktop Usage
 
-### AI/ML 库
-- TensorFlow.js 4.11.0 - 深度学习推理
-- COCO-SSD - 预训练对象检测模型
+- Full sidebar navigation on screens > 900px
+- Webcam support for card detection
+- Keyboard shortcuts for quick input
 
-### 算法
-- 图像处理：灰度转换、CLAHE、自适应阈值
-- 特征提取：网格特征向量、密度分析
-- 识别方法：模板匹配、贝叶斯分类、启发式识别
+## 🎴 Card Format
 
-## 📝 文件说明
+```
+Rank: A K Q J T 9 8 7 6 5 4 3 2
+Suit: s(♠) h(♥) d(♦) c(♣)
 
-| 文件 | 说明 |
-|------|------|
-| `index.html` | 主应用界面和样式 |
-| `app.js` | 扑克引擎、UI 交互、权益计算 |
-| `ml-card-detector.js` | **新增** - ML 卡片检测器 (深度学习) |
-| `improved-card-detector.js` | **新增** - 改进检测器 (自适应光照) |
-| `card-detector.js` | 传统卡片检测器 (备选方案) |
-| `manifest.json` | PWA 配置 |
-
-## 🔧 配置调整
-
-### 识别阈值 (ml-card-detector.js)
-```javascript
-this.detectionThreshold = 0.6; // 置信度门槛，0-1，更高更严格
+Examples:
+  AsKh = A♠ K♥
+  TdTc = T♦ T♣ (pocket tens)
+  QsJsTs = Q♠ J♠ T♠ (board)
 ```
 
-### 光照适应 (improved-card-detector.js)
-```javascript
-this.claheEnabled = true;      // 启用 CLAHE
-this.adaptiveThreshold = true; // 启用自适应二值化
+## 🔧 Three Modes
+
+### 1. AI Scanner
+- Start camera
+- Point at cards
+- Auto-detect or click Detect
+- Cards assigned automatically (first 2 = hand, rest = board)
+
+### 2. Manual Select  
+- Click cards in the 52-card grid
+- Toggle between Hand/Board mode
+- Click cards to select/deselect
+
+### 3. Quick Input
+- Type cards directly: `AsKh`
+- Enter board: `TdJdQd`
+- Fast batch analysis
+
+## 📊 Equity Calculation
+
+Uses Monte Carlo simulation:
+- 8,000+ random simulations
+- Evaluates all hand combinations
+- Calculates win/tie/lose percentages
+- Accounts for multiple opponents
+
+## 🤖 Card Detection Tips
+
+For best AI recognition:
+- Good lighting (avoid shadows)
+- Dark/solid background
+- Cards flat and fully visible
+- Standard poker card design
+- Hold camera steady
+
+## 📁 Files
+
+```
+poker_pwa/
+├── index.html       # Main app (responsive)
+├── app.js           # Poker engine + UI
+├── card-detector.js # Computer vision detection
+├── manifest.json    # PWA configuration
+├── icon-192.png     # App icon
+└── icon-512.png     # Large icon
 ```
 
-## 🛠️ 部署到 GitHub Pages
+## 🚀 Deploy to GitHub Pages
 
 ```bash
-# 克隆或复制项目文件
+# 1. Create repo
+gh repo create poker-ai --public
+
+# 2. Push files
 git init
 git add .
-git commit -m "Poker AI with ML Recognition"
-gh repo create poker-ai --public --source=. --push
+git commit -m "Poker AI"
+git remote add origin https://github.com/USERNAME/poker-ai.git
+git push -u origin main
 
-# 在 GitHub 仓库设置中启用 Pages
-# 选择 main 分支作为部署源
+# 3. Enable Pages
+# Settings → Pages → Source: main branch
 ```
 
-## 💡 最佳实践
+## 📄 License
 
-### 环境要求
-- ✅ 自然光或均匀照明
-- ✅ 简洁背景 (黑色或深色最佳)
-- ✅ 卡片清晰可见，无遮挡
-- ✅ 现代浏览器 (Chrome 90+, Safari 15+)
+MIT License - Free for personal and commercial use.
 
-### 常见问题
+---
 
-**Q: 识别准确率低？**
-- A: 尝试改变光线角度、增加背景对比度、使用 "Improved" 检测器
-
-**Q: 检测很慢？**
-- A: 关闭 "Auto" 模式，使用手动 "Detect"；或切换到 "Traditional" 检测器
-
-**Q: 权益计算不准？**
-- A: 确保手牌正确识别，对手数量设置准确
-
-## 📈 识别准确率提升方案
-
-1. **打造专用训练集**: 收集真实扑克牌数据，微调模型
-2. **集成强化学习**: 通过用户反馈持续改进
-3. **多模型集成**: 投票机制结合多个检测器结果
-4. **边缘计算**: 在设备上进行持续学习
-
-## 📄 许可证
-
-MIT License - 自由使用和修改
-
-## 🤝 贡献
-
-欢迎提交 Pull Request 或 Issue 改进此项目！
+Made with ♠️♥️♦️♣️

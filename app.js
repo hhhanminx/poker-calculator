@@ -139,15 +139,7 @@ function getGTO(codes) {
 
 class PokerAI {
     constructor() {
-        // 多个检测器按优先级排列
-        this.detectors = [
-            { name: 'ML', detector: null },
-            { name: 'Improved', detector: null },
-            { name: 'Traditional', detector: null }
-        ];
-        this.detector = null;
-        this.detectorName = 'Unknown';
-        
+        this.detector = new CardDetector();
         this.cameraStream = null;
         this.facingMode = 'environment';
         this.autoDetect = false;
@@ -172,48 +164,15 @@ class PokerAI {
     
     async init() {
         // Show loading screen
-        this.updateLoading('初始化 AI 模型...', 5);
+        this.updateLoading('Initializing AI...', 5);
         
-        // 尝试初始化 ML 检测器
-        this.updateLoading('加载 ML 模型...', 10);
-        const mlDetector = new MLCardDetector();
-        const mlReady = await mlDetector.initialize((msg, progress) => {
+        // Initialize detector
+        await this.detector.initialize((msg, progress) => {
             this.updateLoading(msg, progress);
         });
-        this.detectors[0].detector = mlDetector;
-        
-        if (mlReady) {
-            this.detector = mlDetector;
-            this.detectorName = 'ML';
-        } else {
-            // 尝试初始化改进的检测器
-            this.updateLoading('初始化改进检测器...', 50);
-            const improvedDetector = new ImprovedCardDetector();
-            const improvedReady = await improvedDetector.initialize((msg, progress) => {
-                this.updateLoading(`${msg}`, progress);
-            });
-            this.detectors[1].detector = improvedDetector;
-            
-            if (improvedReady) {
-                this.detector = improvedDetector;
-                this.detectorName = 'Improved';
-            } else {
-                // 降级到传统检测器
-                this.updateLoading('初始化传统检测器...', 70);
-                const tradDetector = new CardDetector();
-                await tradDetector.initialize((msg, progress) => {
-                    this.updateLoading(`传统模式：${msg}`, progress);
-                });
-                this.detectors[2].detector = tradDetector;
-                this.detector = tradDetector;
-                this.detectorName = 'Traditional';
-            }
-        }
         
         // Hide loading
-        setTimeout(() => {
-            document.getElementById('model-loading').classList.add('hidden');
-        }, 500);
+        document.getElementById('model-loading').classList.add('hidden');
         
         // Setup UI
         this.setupTabs();
@@ -230,14 +189,29 @@ class PokerAI {
     }
     
     setupTabs() {
+        // Mobile tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
-            });
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
+        
+        // Desktop sidebar
+        document.querySelectorAll('.sidebar-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+        });
+    }
+    
+    switchTab(tabName) {
+        // Update mobile tabs
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll(`.tab-btn[data-tab="${tabName}"]`).forEach(b => b.classList.add('active'));
+        
+        // Update sidebar
+        document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll(`.sidebar-btn[data-tab="${tabName}"]`).forEach(b => b.classList.add('active'));
+        
+        // Update content
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`${tabName}-tab`).classList.add('active');
     }
     
     setupScanTab() {
@@ -428,7 +402,7 @@ class PokerAI {
     
     detectOnce() {
         if (!this.cameraStream) {
-            this.showToast('请先启动摄像头', true);
+            this.showToast('Start camera first', true);
             return;
         }
         
@@ -440,8 +414,7 @@ class PokerAI {
         const elapsed = performance.now() - startTime;
         
         this.processDetectedCards(cards);
-        const detectorInfo = `(${this.detectorName} 检测器)`;
-        this.updateStatus(`检测到 ${cards.length} 张卡片 ${detectorInfo} (${elapsed.toFixed(0)}ms)`, cards.length > 0);
+        this.updateStatus(`Detected ${cards.length} cards (${elapsed.toFixed(0)}ms)`, cards.length > 0);
         document.getElementById('status-fps').textContent = `${elapsed.toFixed(0)}ms`;
     }
     
@@ -451,8 +424,8 @@ class PokerAI {
         
         if (this.autoDetect) {
             btn.classList.add('recording');
-            btn.innerHTML = '<span class="btn-cam-icon">⏹</span><span>停止</span>';
-            this.updateStatus('自动检测中...', true);
+            btn.innerHTML = '<span class="btn-cam-icon">⏹</span><span>Stop</span>';
+            this.updateStatus('Auto-detecting...', true);
             
             this.autoInterval = setInterval(() => {
                 if (this.cameraStream) {
@@ -468,8 +441,8 @@ class PokerAI {
             }, 200); // 5 FPS
         } else {
             btn.classList.remove('recording');
-            btn.innerHTML = '<span class="btn-cam-icon">🔄</span><span>自动</span>';
-            this.updateStatus('自动检测已停止', false);
+            btn.innerHTML = '<span class="btn-cam-icon">🔄</span><span>Auto</span>';
+            this.updateStatus('Auto-detect stopped', false);
             
             if (this.autoInterval) {
                 clearInterval(this.autoInterval);
